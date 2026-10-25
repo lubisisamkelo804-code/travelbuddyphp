@@ -8,7 +8,7 @@ return [
             'tip' => true, 'currency' => true, 'photo' => true, 'people' => true,
             'quote' => true, 'minimap' => true,
         ],
-        'weather' => ['city' => 'Cape Town', 'lat' => -33.9249, 'lng' => 18.4241],
+        'weather' => ['city' => 'Johannesburg', 'lat' => -26.2041, 'lng' => 28.0473],
         'currency' => ['base' => 'ZAR', 'list' => ['ZAR', 'USD', 'EUR', 'GBP', 'JPY', 'AED', 'KES', 'BWP']],
     ],
 ];

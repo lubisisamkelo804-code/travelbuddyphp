@@ -71,6 +71,7 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/inbox', [InboxController::class, 'index'])->name('inbox.index');
     Route::post('/inbox', [InboxController::class, 'store'])->name('inbox.store');
+    Route::post('/inbox/users/{user}', [InboxController::class, 'start'])->whereNumber('user')->name('inbox.start');
     Route::get('/inbox/{conversation}', [InboxController::class, 'show'])->whereNumber('conversation')->name('inbox.show');
     Route::post('/inbox/{conversation}/send', [InboxController::class, 'send'])->whereNumber('conversation')->name('inbox.send');
 

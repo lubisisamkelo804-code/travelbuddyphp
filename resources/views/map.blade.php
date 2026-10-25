@@ -50,7 +50,11 @@
             if (p.kind === 'event' && !showE) return;
             var cta = p.kind === 'destination' ? "View owner's page →" : 'Book this event →';
             layer.addLayer(L.marker([p.lat, p.lng], { icon: iconFor(p.kind) })
-                .bindPopup('<b>' + p.name + '</b><br><span style="color:#8a7f73">' + p.city + '</span><br><a href="' + p.url + '" style="color:#c4502a;font-weight:700">' + cta + '</a>'));
+                .bindPopup('<b>' + p.name + '</b><br><span style="color:#8a7f73">' + p.city + '</span>'
+                    + '<div class="pin-rating">★ ' + (p.rating > 0 ? p.rating.toFixed(1) : 'New')
+                    + (p.reviews > 0 ? ' <span style="color:#8a7f73">(' + p.reviews + ' review' + (p.reviews === 1 ? '' : 's') + ')</span>' : '')
+                    + '</div>'
+                    + '<a href="' + p.url + '" style="color:#c4502a;font-weight:700">' + cta + '</a>'));
             pts.push([p.lat, p.lng]);
         });
         if (pts.length > 1) map.fitBounds(pts, { padding: [50, 50] });

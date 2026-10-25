@@ -7,6 +7,8 @@ use App\Models\Event;
 use App\Models\Post;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use App\Support\Notifier;
+use Illuminate\Support\Str;
 
 class PostController extends Controller
 {
@@ -87,7 +89,27 @@ class PostController extends Controller
 
     public function like(Post $post)
     {
+        $sessionKey = 'liked_post_' . $post->id;
+
+        if ($post->author_id === Auth::id()) {
+            return back()->with('error', 'You cannot like your own post.');
+        }
+        if (session($sessionKey)) {
+            return back()->with('error', 'You have already liked this post.');
+        }
+
         $post->increment('like_count');
+        session([$sessionKey => true]);
+
+        // alert the author (toast + bell notification)
+        if ($post->author && $post->author->id !== Auth::id()) {
+            Notifier::send(
+                $post->author,
+                '❤️ ' . Auth::user()->name . ' liked your post: ' . Str::limit($post->content, 40),
+                route('posts.show', $post)
+            );
+        }
+
         return back();
     }
 
