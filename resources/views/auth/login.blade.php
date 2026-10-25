@@ -10,7 +10,10 @@
         <input class="input" type="text" name="email" value="{{ old('email') }}" placeholder="you@wander.co" required autofocus></div>
     <div class="field"><label>Password</label>
         <input class="input" type="password" name="password" placeholder="••••••••" required></div>
-    <label class="check"><input type="checkbox" name="remember"> Remember me</label>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:.5rem">
+        <label class="check"><input type="checkbox" name="remember"> Remember me</label>
+        <a href="{{ route('password.forgot') }}" style="font-size:.85rem">Forgot password?</a>
+    </div>
     <button class="btn btn-primary btn-block" type="submit"><i class="fa-solid fa-right-to-bracket"></i> Log in</button>
 </form>
 <div class="auth-divider">OR</div>
