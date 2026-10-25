@@ -31,6 +31,7 @@ class User extends Authenticatable
     public function posts() { return $this->hasMany(Post::class, 'author_id'); }
     public function notifications() { return $this->hasMany(Notification::class); }
     public function conversations() { return $this->belongsToMany(Conversation::class)->withTimestamps(); }
+    public function conversationUsers() { return $this->hasMany(ConversationUser::class, 'user_id'); }
 
     public function isOwner(): bool { return $this->role === self::ROLE_OWNER; }
     public function isCreator(): bool { return $this->role === self::ROLE_CREATOR; }
