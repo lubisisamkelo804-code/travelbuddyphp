@@ -39,7 +39,20 @@
         @if($results['people']->count())
             <h2 class="section-title">People</h2>
             @foreach($results['people'] as $u)
-                <a class="res-row" href="{{ route('owners.show', $u) }}"><div class="res-ico">@if($u->avatarSource())<img src="{{ $u->avatarSource() }}" alt="">@else<i class="fa-regular fa-user"></i>@endif</div><div><div class="res-name">{{ $u->name }}</div><div class="res-sub">{{ '@' . $u->username }} · {{ ucfirst(str_replace('_', ' ', $u->role)) }}</div></div></a>
+                <div class="res-row" style="display:flex;align-items:center">
+                    <a href="{{ route('owners.show', $u) }}" style="display:flex;align-items:center;gap:10px;color:inherit;text-decoration:none;min-width:0">
+                        <div class="res-ico">@if($u->avatarSource())<img src="{{ $u->avatarSource() }}" alt="">@else<i class="fa-regular fa-user"></i>@endif</div>
+                        <div><div class="res-name">{{ $u->name }}</div><div class="res-sub">{{ '@' . $u->username }} · {{ ucfirst(str_replace('_', ' ', $u->role)) }}</div></div>
+                    </a>
+                    @auth
+                        @if($u->id !== auth()->id())
+                            <form method="POST" action="{{ route('inbox.start', $u) }}">
+                                @csrf
+                                <button class="btn-mini" type="submit"><i class="fa-regular fa-paper-plane"></i> Message</button>
+                            </form>
+                        @endif
+                    @endauth
+                </div>
             @endforeach
         @endif
     @endif

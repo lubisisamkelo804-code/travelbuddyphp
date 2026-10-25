@@ -93,7 +93,7 @@
         <div class="rail-list">
             @foreach($rail['people'] as $p)
             <a class="rail-row" href="{{ route('owners.show', $p['id']) }}">
-                <span class="rail-avatar">{{ strtoupper(substr($p['name'], 0, 1)) }}</span>
+                <span class="rail-avatar">@if(!empty($p['avatar']))<img src="{{ $p['avatar'] }}" alt="">@else{{ strtoupper(substr($p['name'], 0, 1)) }}@endif</span>
                 <span class="rail-row-body"><b>{{ $p['name'] }}</b><small>{{ implode(' · ', array_filter($p['tags'])) }}</small></span>
                 <span class="chip chip-green">Say hi</span>
             </a>

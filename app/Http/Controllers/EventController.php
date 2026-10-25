@@ -62,7 +62,7 @@ class EventController extends Controller
 
     public function store(Request $r)
     {
-        $data = $this->validateEvent($r);
+        $data = $this->validateEvent($r, isNew: true);
         $event = Event::create(['creator_id' => Auth::id()] + $data);
         if ($r->has('interests')) $event->interests()->sync($r->interests);
 
@@ -105,35 +105,48 @@ class EventController extends Controller
 
     public function book(Request $r, Event $event)
     {
-        $r->validate(['guests' => 'integer|min:1|max:20', 'notes' => 'nullable|max:500']);
+        $data = $r->validate([
+            'guests' => 'integer|min:1|max:20', 'notes' => 'nullable|string|max:500',
+        ]);
+        $guests = max(1, (int) ($data['guests'] ?? 1));
 
         if ($event->external_booking_url) return redirect()->away($event->external_booking_url);
         if ($event->isPast()) return back()->with('error', 'This event has already ended.');
         if ($event->bookingClosed()) return back()->with('error', 'Bookings for this event have closed.');
-        if ($event->isFull()) return back()->with('error', 'This event is fully booked.');
+
+        // one active booking per user per event
         if (Booking::where('user_id', Auth::id())->where('event_id', $event->id)
             ->where('status', '!=', 'cancelled')->exists()) {
             return back()->with('error', 'You have already booked this event.');
         }
 
-        Booking::create([
-            'user_id' => Auth::id(), 'event_id' => $event->id,
-            'guests' => $r->integer('guests') ?: 1, 'notes' => $r->input('notes'),
-        ]);
-
-        $event->increment('booking_count');
-        $event->refresh();
-
-        if ($event->isFull()) {
-            Post::where('event_id', $event->id)->where('type', Post::TYPE_EVENT)->delete();
+        // lock the row to avoid race conditions on capacity checks
+        $fresh = Event::whereKey($event->id)->lockForUpdate()->firstOrFail();
+        if ($fresh->isFull()) return back()->with('error', 'This event is fully booked.');
+        if ($fresh->capacity !== null && $fresh->booking_count + $guests > $fresh->capacity) {
+            return back()->with('error', 'Only ' . max(0, $fresh->capacity - $fresh->booking_count) . ' spot(s) left — try fewer guests.');
         }
 
-        Notifier::send($event->creator, Auth::user()->name . ' is attending ' . $event->title, route('bookings.index'));
+        \Illuminate\Support\Facades\DB::transaction(function () use ($fresh, $guests, $data) {
+            Booking::create([
+                'user_id' => Auth::id(), 'event_id' => $fresh->id,
+                'guests' => $guests, 'notes' => $data['notes'] ?? null,
+            ]);
+
+            $fresh->increment('booking_count');
+            $fresh->refresh();
+
+            if ($fresh->isFull()) {
+                Post::where('event_id', $fresh->id)->where('type', Post::TYPE_EVENT)->delete();
+            }
+
+            Notifier::send($fresh->creator, Auth::user()->name . ' is attending ' . $fresh->title, route('bookings.index'));
+        });
 
         return back()->with('success', "You're attending!");
     }
 
-    private function validateEvent(Request $r): array
+    private function validateEvent(Request $r, bool $isNew = false): array
     {
         $data = $r->validate([
             'title' => 'required|string|min:2|max:255',
@@ -144,7 +157,7 @@ class EventController extends Controller
             'city' => 'required|string|max:150',
             'latitude' => 'nullable|numeric|between:-90,90',
             'longitude' => 'nullable|numeric|between:-180,180',
-            'start_date' => 'required|date|after:now',
+            'start_date' => 'required|date' . ($isNew ? '|after:now' : ''),
             'end_date' => 'required|date|after:start_date',
             'booking_end_date' => 'nullable|date|before_or_equal:start_date',
             'external_booking_url' => 'nullable|url|max:500',

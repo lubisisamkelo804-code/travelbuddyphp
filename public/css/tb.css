@@ -225,4 +225,15 @@ select.input{cursor:pointer}
 .sidebar{display:none}
 .main-content{padding:0 16px 90px}
 .bottom-nav{display:flex}
-}
+}/* interest chips (hidden-checkbox pattern) */
+label.chip{user-select:none}
+label.chip input[type="checkbox"]{display:none!important}
+/* profile pictures in chat bubbles */
+.bub-wrap{display:flex;align-items:flex-end;gap:8px;margin-bottom:10px}
+.bub-wrap.me{flex-direction:row-reverse}
+.bub-pfp{width:30px;height:30px;border-radius:50%;background:var(--cream);color:var(--mocha);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;overflow:hidden;flex-shrink:0}
+.bub-pfp img{width:100%;height:100%;object-fit:cover}
+/* people search: message button */
+.res-row .btn-mini{margin-left:auto;flex-shrink:0}
+.rail-avatar img{width:100%;height:100%;object-fit:cover;border-radius:50%}
+.pin-rating{margin:2px 0 4px;font-weight:800;color:#dd9a2b}

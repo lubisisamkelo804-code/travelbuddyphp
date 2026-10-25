@@ -10,9 +10,9 @@ class WeatherService
     public function current(?string $city = null, ?float $lat = null, ?float $lng = null): array
     {
         $cfg = config('travelbuddy.rail.weather', []);
-        $city = $city ?: ($cfg['city'] ?? 'Cape Town');
-        $lat = $lat ?? ($cfg['lat'] ?? -33.9249);
-        $lng = $lng ?? ($cfg['lng'] ?? 18.4241);
+        $city = $city ?: ($cfg['city'] ?? 'Johannesburg');
+        $lat = $lat ?? ($cfg['lat'] ?? -26.2041);
+        $lng = $lng ?? ($cfg['lng'] ?? 28.0473);
 
         return Cache::remember("rail.wx.{$lat}.{$lng}", 1800, function () use ($city, $lat, $lng) {
             try {

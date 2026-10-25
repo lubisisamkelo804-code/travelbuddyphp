@@ -229,12 +229,12 @@ class TravelRail
                         ->join('users as u', 'u.id', '=', 'ui.user_id')
                         ->whereIn('ui.interest_id', $mine)
                         ->where('u.id', '!=', $me)
-                        ->select('u.id', 'u.name', 'ui.interest_id')
+                        ->select('u.id', 'u.name', 'u.avatar_url', 'u.avatar_path', 'ui.interest_id')
                         ->limit(30)->get();
 
                     foreach ($rows as $r) {
                         if (! isset($found[$r->id])) {
-                            $found[$r->id] = ['id' => $r->id, 'name' => e($r->name), 'tags' => []];
+                            $found[$r->id] = ['id' => $r->id, 'name' => e($r->name), 'avatar' => $this->avatarOf($r), 'tags' => []];
                         }
                         if (count($found[$r->id]['tags']) < 2) {
                             $label = $labels[$r->interest_id] ?? '';
@@ -249,9 +249,10 @@ class TravelRail
 
         if (empty($found)) {
             try {
-                $rows = DB::table('users')->where('id', '!=', $me ?? 0)->orderByDesc('id')->limit(3)->get();
+                $rows = DB::table('users')->where('id', '!=', $me ?? 0)->orderByDesc('id')->limit(3)
+                    ->get(['id', 'name', 'avatar_url', 'avatar_path']);
                 foreach ($rows as $r) {
-                    $found[$r->id] = ['id' => $r->id, 'name' => e($r->name), 'tags' => []];
+                    $found[$r->id] = ['id' => $r->id, 'name' => e($r->name), 'avatar' => $this->avatarOf($r), 'tags' => []];
                 }
             } catch (\Throwable $e) {
                 return [];
@@ -259,6 +260,12 @@ class TravelRail
         }
 
         return array_slice(array_values($found), 0, 3);
+    }
+
+    private function avatarOf(object $row): ?string
+    {
+        if (! empty($row->avatar_path)) return asset('storage/' . $row->avatar_path);
+        return ! empty($row->avatar_url) ? $row->avatar_url : null;
     }
 
     private function quote(): array

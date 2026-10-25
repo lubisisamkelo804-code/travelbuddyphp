@@ -120,7 +120,13 @@ class AuthController extends Controller
     {
         if (! config('services.google.client_id')) return redirect(route('login'));
 
-        $g = Socialite::driver('google')->user();
+        try {
+            $g = Socialite::driver('google')->user();
+        } catch (\Throwable $e) {
+            report($e);
+            return redirect()->route('login')->withErrors(['email' => 'Google sign-in failed. Please try again or log in with your password.']);
+        }
+
         $user = User::where('google_id', $g->id)->orWhere('email', $g->email)->first();
 
         if (! $user) {
@@ -130,6 +136,9 @@ class AuthController extends Controller
                 'password' => str()->random(32),
                 'google_id' => $g->id, 'avatar_url' => $g->avatar,
             ]);
+        } elseif (! $user->google_id) {
+            // link Google to the existing account and refresh avatar
+            $user->forceFill(['google_id' => $g->id] + ($g->avatar && ! $user->avatar_url ? ['avatar_url' => $g->avatar] : []))->save();
         }
 
         Auth::login($user, true);

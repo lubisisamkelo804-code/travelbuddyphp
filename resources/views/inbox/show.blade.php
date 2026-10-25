@@ -13,25 +13,28 @@
     </div>
     <div class="chat-msgs">
         @foreach($conversation->messages as $m)
-            @php $item = $m->share_type ? $m->shareItem() : null; @endphp
-            <div class="bub {{ $m->sender_id === $me->id ? 'me' : 'them' }}">
-                @if($m->body){{ $m->body }}@endif
-                @if($item)
-                    @php
-                        $link = match($m->share_type) {
-                            'post' => route('posts.show', $item),
-                            'destination' => route('destinations.show', $item),
-                            'event' => route('events.show', $item),
-                        };
-                        $label = match($m->share_type) {
-                            'post' => Str::limit($item->content, 60),
-                            'destination' => $item->name,
-                            'event' => $item->title,
-                        };
-                    @endphp
-                    <a class="share-card" href="{{ $link }}"><i class="fa-solid fa-share-nodes"></i> {{ $label }}</a>
-                @endif
-                <div class="bub-time">{{ $m->created_at->diffForHumans() }}</div>
+            @php $item = $m->share_type ? $m->shareItem() : null; $sender = $m->sender; @endphp
+            <div class="bub-wrap {{ $m->sender_id === $me->id ? 'me' : 'them' }}">
+                <span class="bub-pfp" title="{{ $sender?->name }}">@if($sender && $sender->avatarSource())<img src="{{ $sender->avatarSource() }}" alt="">@else{{ strtoupper(substr($sender?->name ?? '?', 0, 1)) }}@endif</span>
+                <div class="bub {{ $m->sender_id === $me->id ? 'me' : 'them' }}">
+                    @if($m->body){{ $m->body }}@endif
+                    @if($item)
+                        @php
+                            $link = match($m->share_type) {
+                                'post' => route('posts.show', $item),
+                                'destination' => route('destinations.show', $item),
+                                'event' => route('events.show', $item),
+                            };
+                            $label = match($m->share_type) {
+                                'post' => Str::limit($item->content, 60),
+                                'destination' => $item->name,
+                                'event' => $item->title,
+                            };
+                        @endphp
+                        <a class="share-card" href="{{ $link }}"><i class="fa-solid fa-share-nodes"></i> {{ $label }}</a>
+                    @endif
+                    <div class="bub-time">{{ $m->created_at->diffForHumans() }}</div>
+                </div>
             </div>
         @endforeach
     </div>

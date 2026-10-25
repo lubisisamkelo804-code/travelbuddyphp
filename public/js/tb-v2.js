@@ -66,4 +66,18 @@ if (railMap && window.L) {
 /* inbox: scroll chat to newest */
 const msgs = $('.chat-msgs');
 if (msgs) msgs.scrollTop = msgs.scrollHeight;
+
+/* interest chips: hidden checkbox + chip-on highlight */
+$$('label.chip').forEach(function (chip) {
+    const input = chip.querySelector('input[type="checkbox"]');
+    if (!input) return;
+    const sync = () => chip.classList.toggle('chip-on', input.checked);
+    sync();
+    input.addEventListener('change', sync);
+    chip.addEventListener('click', function (e) {
+        e.preventDefault();               // stop double-toggle / label quirks
+        input.checked = !input.disabled && !input.checked;
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+});
 })();
