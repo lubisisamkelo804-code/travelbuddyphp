@@ -3,10 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\Rules\Password;
+use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Str;
+use Illuminate\Validation\Rules\Password as PasswordRule;
 use Laravel\Socialite\Facades\Socialite;
 
 class AuthController extends Controller
@@ -31,13 +34,58 @@ class AuthController extends Controller
 
     public function showRegister() { return view('auth.register'); }
 
+    /* ---------- FORGOT / RESET PASSWORD ---------- */
+
+    public function showForgotPassword() { return view('auth.forgot-password'); }
+
+    public function sendResetLink(Request $r)
+    {
+        $r->validate(['email' => 'required|email']);
+
+        $status = Password::sendResetLink($r->only('email'));
+
+        return $status === Password::RESET_LINK_SENT
+            ? back()->with('success', __($status))
+            : back()->withErrors(['email' => __($status)])->onlyInput('email');
+    }
+
+    public function showResetPassword(Request $r, string $token)
+    {
+        return view('auth.reset-password', ['token' => $token, 'email' => $r->input('email')]);
+    }
+
+    public function resetPassword(Request $r)
+    {
+        $r->validate([
+            'token' => 'required',
+            'email' => 'required|email',
+            'password' => ['required', 'confirmed', PasswordRule::min(8)->letters()->numbers()],
+        ]);
+
+        $status = Password::reset(
+            $r->only('email', 'password', 'password_confirmation', 'token'),
+            function (User $user, string $password) {
+                $user->forceFill([
+                    'password' => Hash::make($password),
+                    'remember_token' => Str::random(60),
+                ])->save();
+
+                event(new PasswordReset($user));
+            }
+        );
+
+        return $status === Password::PASSWORD_RESET
+            ? redirect()->route('login')->with('success', __($status))
+            : back()->withErrors(['email' => __($status)])->onlyInput('email');
+    }
+
     public function register(Request $r)
     {
         $data = $r->validate([
             'name' => 'required|string|min:2|max:100',
             'username' => 'required|string|min:3|max:50|alpha_dash|unique:users',
             'email' => 'required|email|unique:users',
-            'password' => ['required', 'confirmed', Password::min(8)->letters()->numbers()],
+            'password' => ['required', 'confirmed', PasswordRule::min(8)->letters()->numbers()],
             'role' => 'required|in:visitor,destination_owner,event_creator',
         ]);
 
