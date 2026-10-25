@@ -7,9 +7,22 @@ use App\Http\Controllers\{
     RecommendationController, ReviewController, SearchController
 };
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Storage;
 
 /* ---------- PUBLIC ---------- */
 Route::get('/', [HomeController::class, 'index'])->name('home');
+
+// Storage fallback: streams any file from storage/app/public when the
+// public/storage symlink is missing (common on XAMPP/Windows where
+// "php artisan storage:link" was never run or symlink creation failed).
+Route::get('/storage-fallback/{path}', function (string $path) {
+    abort_unless(Storage::disk('public')->exists($path), 404);
+    abort_if(str_contains($path, '..'), 400);
+
+    $mime = Storage::disk('public')->mimeType($path) ?: 'application/octet-stream';
+
+    return response()->file(Storage::disk('public')->path($path), ['Content-Type' => $mime]);
+})->where('path', '.*')->name('storage.fallback');
 
 Route::middleware('guest')->group(function () {
     Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
@@ -35,6 +48,7 @@ Route::get('/events', [EventController::class, 'index'])->name('events.index');
 Route::get('/events/{event}', [EventController::class, 'show'])->whereNumber('event')->name('events.show');
 Route::get('/community', [PostController::class, 'index'])->name('community');
 Route::get('/posts/{post}', [PostController::class, 'show'])->whereNumber('post')->name('posts.show');
+Route::get('/media/{media}', [PostController::class, 'media'])->whereNumber('media')->name('media.show');
 Route::get('/owners/{user}', [ProfileController::class, 'publicPosts'])->whereNumber('user')->name('owners.show');
 Route::get('/explore', [RecommendationController::class, 'explore'])->name('explore');
 Route::get('/for-you', [RecommendationController::class, 'explore'])->name('recommendations');

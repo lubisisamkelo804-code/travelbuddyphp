@@ -10,10 +10,23 @@
             <textarea name="content" rows="3" required maxlength="2000" placeholder="Where are you exploring today, {{ auth()->user()->name }}?">{{ old('content') }}</textarea>
             <div class="composer-row">
                 <label class="file-btn"><i class="fa-regular fa-image"></i> Add up to 4 photos/videos
-                    <input type="file" name="media[]" multiple accept="image/*,video/*" hidden>
+                    <input type="file" name="media[]" id="composer-media" multiple accept="image/*,video/*" hidden>
                 </label>
                 <span class="media-count" id="media-count"></span>
             </div>
+            <script>
+            // Show the selected file names/count so users get feedback that
+            // their picks will actually be uploaded with the post.
+            (function () {
+                var input = document.getElementById('composer-media');
+                var out = document.getElementById('media-count');
+                if (!input || !out) return;
+                input.addEventListener('change', function () {
+                    var n = input.files ? input.files.length : 0;
+                    out.textContent = n ? (n + ' file' + (n > 1 ? 's' : '') + ' selected') : '';
+                });
+            })();
+            </script>
             <div class="composer-row">
                 @if(auth()->user()->isCreator())
                     <select name="event_id" required>

@@ -47,8 +47,14 @@ class PostController extends Controller
             'destination_id' => $type === Post::TYPE_EVENT ? 'nullable|integer|exists:destinations,id' : 'required|integer|exists:destinations,id',
             'event_id' => $type === Post::TYPE_EVENT ? 'required|integer|exists:events,id' : 'nullable|integer',
             'media' => 'nullable|array|max:4',
-            'media.*' => 'file|mimes:jpg,jpeg,png,webp,mp4,webm|max:20480',
+            'media.*' => 'nullable,file,mimes:jpg,jpeg,png,webp,mp4,webm|max:20480',
         ]);
+
+        // Drop empty file inputs (browsers submit an empty entry when the picker is untouched).
+        $files = array_values(array_filter(
+            $r->file('media') ?? [],
+            fn ($f) => $f instanceof \Illuminate\Http\UploadedFile && $f->isValid()
+        ));
 
         if ($type === Post::TYPE_BUSINESS) {
             $dest = Destination::findOrFail($data['destination_id']);
@@ -62,7 +68,8 @@ class PostController extends Controller
 
         $locationRating = null;
         if (! empty($data['destination_id'])) {
-            $locationRating = (float) Destination::find($data['destination_id'])->average_rating;
+            $dest = Destination::withAvg('reviews', 'rating')->find($data['destination_id']);
+            $locationRating = $dest ? (float) $dest->reviews_avg_rating : null;
         }
 
         $post = Post::create([
@@ -74,17 +81,37 @@ class PostController extends Controller
             'location_rating' => $locationRating,
         ]);
 
-        if ($r->hasFile('media')) {
-            foreach ($r->file('media') as $i => $file) {
+        $saved = 0;
+        foreach ($files as $i => $file) {
+            try {
+                // Store with the original extension so the browser serves the
+                // right Content-Type (a .mp4 saved without an extension will
+                // not render in <video>/<img> tags).
+                $ext    = strtolower(pathinfo($file->getClientOriginalName(), PATHINFO_EXTENSION)) ?: $file->extension() ?: 'bin';
+                $stored = $file->storeAs('post-media', Str::random(20) . '.' . $ext, 'public');
+
+                $isVideo = str_starts_with((string) $file->getMimeType(), 'video')
+                    || in_array($ext, ['mp4', 'webm', 'mov', 'm4v'], true);
+
                 $post->media()->create([
-                    'kind' => str_starts_with((string) $file->getMimeType(), 'video') ? 'video' : 'image',
-                    'path' => $file->store('post-media', 'public'),
+                    'kind'     => $isVideo ? 'video' : 'image',
+                    'path'     => $stored,
                     'position' => $i,
                 ]);
+                $saved++;
+            } catch (\Throwable $e) {
+                report($e);
+                // Continue storing remaining files even if one fails.
             }
         }
 
-        return back()->with('success', 'Post published!');
+        // If nothing was saved, flag it so the UI can tell the user why media is missing.
+        if ($files && $saved === 0) {
+            $post->delete();
+            return back()->withInput()->withErrors(['media' => 'All uploads failed to save. Ensure PHP\'s upload_max_filesize/post_max_size allow 20 MB and that "php artisan storage:link" has been run.']);
+        }
+
+        return back()->with('success', $saved ? 'Post published with ' . $saved . ' file(s)!' : 'Post published!');
     }
 
     public function like(Post $post)
@@ -116,7 +143,43 @@ class PostController extends Controller
     public function destroy(Post $post)
     {
         abort_unless($post->author_id === Auth::id(), 403);
+
+        // Remove uploaded files from disk before deleting the records.
+        foreach ($post->media as $m) {
+            \Illuminate\Support\Facades\Storage::disk('public')->delete($m->path);
+        }
+        $post->media()->delete();
         $post->delete();
+
         return back()->with('success', 'Post deleted.');
+    }
+
+    /**
+     * Fallback route that streams post media directly from storage when the
+     * public/storage symlink is missing (e.g. XAMPP setups where
+     * "php artisan storage:link" was never run).
+     */
+    public function media(\App\Models\PostMedia $media)
+    {
+        abort_unless($media->post && $media->post->author_id !== null, 404);
+
+        $full = storage_path('app/public/' . $media->path);
+        abort_unless(is_file($full), 404);
+
+        // Guess the correct MIME type from the file extension so browsers
+        // actually render <video>/<img> tags instead of refusing to play.
+        $ext = strtolower(pathinfo($full, PATHINFO_EXTENSION));
+        $mime = match ($ext) {
+            'mp4' => 'video/mp4',
+            'webm' => 'video/webm',
+            'mov' => 'video/quicktime',
+            'm4v' => 'video/x-m4v',
+            'png' => 'image/png',
+            'gif' => 'image/gif',
+            'webp' => 'image/webp',
+            default => 'image/jpeg',
+        };
+
+        return response()->file($full, ['Content-Type' => $mime]);
     }
 }
