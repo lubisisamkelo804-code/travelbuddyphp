@@ -182,6 +182,8 @@
                         <div style="background:var(--danger-soft);border:1px solid var(--danger);border-radius:var(--r-md);padding:14px;margin-top:20px;font-size:14px;color:var(--danger);font-weight:700">
                             <i class="fa-solid fa-clock-rotate-left"></i> This event has ended
                         </div>
+                    @elseif($event->external_booking_url)
+                        <a href="{{ $event->external_booking_url }}" target="_blank" rel="noopener" class="btn btn-accent btn-block" style="margin-top:20px"><i class="fa-solid fa-arrow-up-right-from-square"></i> Book externally</a>
                     @elseif($event->isFull())
                         <div style="background:var(--danger-soft);border:1px solid var(--danger);border-radius:var(--r-md);padding:14px;margin-top:20px;font-size:14px;color:var(--danger);font-weight:700">
                             <i class="fa-solid fa-user-xmark"></i> Fully booked
@@ -196,11 +198,11 @@
                             @csrf
                             <div class="field">
                                 <label>Guests</label>
-                                <input type="number" name="guests" value="1" min="1" max="20" class="input">
+                                <input type="number" name="guests" value="{{ old('guests', 1) }}" min="1" max="20" class="input">
                             </div>
                             <div class="field">
                                 <label>Notes (optional)</label>
-                                <textarea name="notes" rows="2" class="textarea" placeholder="Any special requests?"></textarea>
+                                <textarea name="notes" rows="2" class="textarea" placeholder="Any special requests?">{{ old('notes') }}</textarea>
                             </div>
                             <button class="btn btn-accent btn-block"><i class="fa-solid fa-calendar-check"></i> Book attendance</button>
                         </form>
