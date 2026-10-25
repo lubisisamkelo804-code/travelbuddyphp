@@ -167,7 +167,11 @@ class EventController extends Controller
         ]);
 
         if ($r->hasFile('image')) {
-            $data['image_url'] = asset('storage/' . $r->file('image')->store('events', 'public'));
+            $file = $r->file('image');
+            $ext  = strtolower($file->extension() ?: 'jpg');
+            // Store the relative path; the model resolves it to a URL with a
+            // fallback for missing storage symlinks (XAMPP/Windows).
+            $data['image_url'] = $file->storeAs('events', Str::random(20) . '.' . $ext, 'public');
         }
         unset($data['image']);
 

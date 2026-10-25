@@ -39,7 +39,14 @@ class User extends Authenticatable
 
     public function avatarSource(): ?string
     {
-        if ($this->avatar_path) return asset('storage/' . $this->avatar_path);
+        if ($this->avatar_path) {
+            // Fall back to a streaming route when the public/storage symlink
+            // is missing (XAMPP/Windows), so avatars still render.
+            if (is_dir(public_path('storage/' . dirname($this->avatar_path))) && file_exists(public_path('storage/' . $this->avatar_path))) {
+                return asset('storage/' . $this->avatar_path);
+            }
+            return route('storage.fallback', ['path' => $this->avatar_path]);
+        }
         return $this->avatar_url ?: null;
     }
 }

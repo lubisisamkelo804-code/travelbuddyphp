@@ -51,7 +51,10 @@ class PostController extends Controller
         ]);
 
         // Drop empty file inputs (browsers submit an empty entry when the picker is untouched).
-        $files = array_values(array_filter($r->file('media') ?? [], fn ($f) => $f !== null && $f->isValid()));
+        $files = array_values(array_filter(
+            $r->file('media') ?? [],
+            fn ($f) => $f instanceof \Illuminate\Http\UploadedFile && $f->isValid()
+        ));
 
         if ($type === Post::TYPE_BUSINESS) {
             $dest = Destination::findOrFail($data['destination_id']);
@@ -78,14 +81,24 @@ class PostController extends Controller
             'location_rating' => $locationRating,
         ]);
 
+        $saved = 0;
         foreach ($files as $i => $file) {
             try {
-                $isVideo = str_starts_with((string) $file->getMimeType(), 'video');
+                // Store with the original extension so the browser serves the
+                // right Content-Type (a .mp4 saved without an extension will
+                // not render in <video>/<img> tags).
+                $ext    = strtolower(pathinfo($file->getClientOriginalName(), PATHINFO_EXTENSION)) ?: $file->extension() ?: 'bin';
+                $stored = $file->storeAs('post-media', Str::random(20) . '.' . $ext, 'public');
+
+                $isVideo = str_starts_with((string) $file->getMimeType(), 'video')
+                    || in_array($ext, ['mp4', 'webm', 'mov', 'm4v'], true);
+
                 $post->media()->create([
-                    'kind' => $isVideo ? 'video' : 'image',
-                    'path' => $file->store('post-media', 'public'),
+                    'kind'     => $isVideo ? 'video' : 'image',
+                    'path'     => $stored,
                     'position' => $i,
                 ]);
+                $saved++;
             } catch (\Throwable $e) {
                 report($e);
                 // Continue storing remaining files even if one fails.
@@ -93,11 +106,12 @@ class PostController extends Controller
         }
 
         // If nothing was saved, flag it so the UI can tell the user why media is missing.
-        if ($files && $post->media()->count() === 0) {
-            return back()->with('error', 'Post published, but uploads failed to save. Check that "php artisan storage:link" has been run and storage/app/public is writable.');
+        if ($files && $saved === 0) {
+            $post->delete();
+            return back()->withInput()->withErrors(['media' => 'All uploads failed to save. Ensure PHP\'s upload_max_filesize/post_max_size allow 20 MB and that "php artisan storage:link" has been run.']);
         }
 
-        return back()->with('success', 'Post published!');
+        return back()->with('success', $saved ? 'Post published with ' . $saved . ' file(s)!' : 'Post published!');
     }
 
     public function like(Post $post)
@@ -152,8 +166,20 @@ class PostController extends Controller
         $full = storage_path('app/public/' . $media->path);
         abort_unless(is_file($full), 404);
 
-        return response()->file($full, [
-            'Content-Type' => $media->kind === 'video' ? 'video/mp4' : 'image/jpeg',
-        ]);
+        // Guess the correct MIME type from the file extension so browsers
+        // actually render <video>/<img> tags instead of refusing to play.
+        $ext = strtolower(pathinfo($full, PATHINFO_EXTENSION));
+        $mime = match ($ext) {
+            'mp4' => 'video/mp4',
+            'webm' => 'video/webm',
+            'mov' => 'video/quicktime',
+            'm4v' => 'video/x-m4v',
+            'png' => 'image/png',
+            'gif' => 'image/gif',
+            'webp' => 'image/webp',
+            default => 'image/jpeg',
+        };
+
+        return response()->file($full, ['Content-Type' => $mime]);
     }
 }

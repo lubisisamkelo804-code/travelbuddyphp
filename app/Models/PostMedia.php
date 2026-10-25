@@ -12,9 +12,15 @@ class PostMedia extends Model
 
     public function getUrlAttribute(): string
     {
-        // storage_path() works even if public/storage symlink is broken;
-        // prefer the public URL when the link exists.
-        if (is_link(public_path('storage')) || file_exists(public_path('storage/' . $this->path))) {
+        // Prefer the static public URL when the storage symlink exists AND the
+        // file has an extension we can serve with a correct Content-Type.
+        // Otherwise fall back to the streaming route, which sets proper MIME
+        // types and works even when "php artisan storage:link" was never run
+        // (common on XAMPP/Windows).
+        $hasLink = is_link(public_path('storage')) || is_dir(public_path('storage'));
+        $hasExt  = (bool) pathinfo($this->path, PATHINFO_EXTENSION);
+
+        if ($hasLink && $hasExt && file_exists(public_path('storage/' . $this->path))) {
             return asset('storage/' . $this->path);
         }
 

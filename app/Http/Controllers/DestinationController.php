@@ -141,7 +141,12 @@ class DestinationController extends Controller
         ]);
 
         if ($r->hasFile('image')) {
-            $data['image_url'] = asset('storage/' . $r->file('image')->store('destinations', 'public'));
+            $file = $r->file('image');
+            $ext  = strtolower($file->extension() ?: 'jpg');
+            $path = $file->storeAs('destinations', Str::random(20) . '.' . $ext, 'public');
+            // Store the relative path; the model/view resolves to a URL with a
+            // fallback for missing storage symlinks (XAMPP/Windows).
+            $data['image_url'] = $path;
         }
         unset($data['image']);
 
