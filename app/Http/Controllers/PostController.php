@@ -47,8 +47,11 @@ class PostController extends Controller
             'destination_id' => $type === Post::TYPE_EVENT ? 'nullable|integer|exists:destinations,id' : 'required|integer|exists:destinations,id',
             'event_id' => $type === Post::TYPE_EVENT ? 'required|integer|exists:events,id' : 'nullable|integer',
             'media' => 'nullable|array|max:4',
-            'media.*' => 'file|mimes:jpg,jpeg,png,webp,mp4,webm|max:20480',
+            'media.*' => 'nullable,file,mimes:jpg,jpeg,png,webp,mp4,webm|max:20480',
         ]);
+
+        // Drop empty file inputs (browsers submit an empty entry when the picker is untouched).
+        $files = array_values(array_filter($r->file('media') ?? [], fn ($f) => $f !== null && $f->isValid()));
 
         if ($type === Post::TYPE_BUSINESS) {
             $dest = Destination::findOrFail($data['destination_id']);
@@ -62,7 +65,8 @@ class PostController extends Controller
 
         $locationRating = null;
         if (! empty($data['destination_id'])) {
-            $locationRating = (float) Destination::find($data['destination_id'])->average_rating;
+            $dest = Destination::withAvg('reviews', 'rating')->find($data['destination_id']);
+            $locationRating = $dest ? (float) $dest->reviews_avg_rating : null;
         }
 
         $post = Post::create([
@@ -74,14 +78,23 @@ class PostController extends Controller
             'location_rating' => $locationRating,
         ]);
 
-        if ($r->hasFile('media')) {
-            foreach ($r->file('media') as $i => $file) {
+        foreach ($files as $i => $file) {
+            try {
+                $isVideo = str_starts_with((string) $file->getMimeType(), 'video');
                 $post->media()->create([
-                    'kind' => str_starts_with((string) $file->getMimeType(), 'video') ? 'video' : 'image',
+                    'kind' => $isVideo ? 'video' : 'image',
                     'path' => $file->store('post-media', 'public'),
                     'position' => $i,
                 ]);
+            } catch (\Throwable $e) {
+                report($e);
+                // Continue storing remaining files even if one fails.
             }
+        }
+
+        // If nothing was saved, flag it so the UI can tell the user why media is missing.
+        if ($files && $post->media()->count() === 0) {
+            return back()->with('error', 'Post published, but uploads failed to save. Check that "php artisan storage:link" has been run and storage/app/public is writable.');
         }
 
         return back()->with('success', 'Post published!');
@@ -116,7 +129,31 @@ class PostController extends Controller
     public function destroy(Post $post)
     {
         abort_unless($post->author_id === Auth::id(), 403);
+
+        // Remove uploaded files from disk before deleting the records.
+        foreach ($post->media as $m) {
+            \Illuminate\Support\Facades\Storage::disk('public')->delete($m->path);
+        }
+        $post->media()->delete();
         $post->delete();
+
         return back()->with('success', 'Post deleted.');
+    }
+
+    /**
+     * Fallback route that streams post media directly from storage when the
+     * public/storage symlink is missing (e.g. XAMPP setups where
+     * "php artisan storage:link" was never run).
+     */
+    public function media(\App\Models\PostMedia $media)
+    {
+        abort_unless($media->post && $media->post->author_id !== null, 404);
+
+        $full = storage_path('app/public/' . $media->path);
+        abort_unless(is_file($full), 404);
+
+        return response()->file($full, [
+            'Content-Type' => $media->kind === 'video' ? 'video/mp4' : 'image/jpeg',
+        ]);
     }
 }

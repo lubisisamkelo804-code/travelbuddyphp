@@ -12,6 +12,12 @@ class PostMedia extends Model
 
     public function getUrlAttribute(): string
     {
-        return asset('storage/' . $this->path);
+        // storage_path() works even if public/storage symlink is broken;
+        // prefer the public URL when the link exists.
+        if (is_link(public_path('storage')) || file_exists(public_path('storage/' . $this->path))) {
+            return asset('storage/' . $this->path);
+        }
+
+        return route('media.show', $this);
     }
 }

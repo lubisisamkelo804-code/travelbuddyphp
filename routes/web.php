@@ -35,6 +35,7 @@ Route::get('/events', [EventController::class, 'index'])->name('events.index');
 Route::get('/events/{event}', [EventController::class, 'show'])->whereNumber('event')->name('events.show');
 Route::get('/community', [PostController::class, 'index'])->name('community');
 Route::get('/posts/{post}', [PostController::class, 'show'])->whereNumber('post')->name('posts.show');
+Route::get('/media/{media}', [PostController::class, 'media'])->whereNumber('media')->name('media.show');
 Route::get('/owners/{user}', [ProfileController::class, 'publicPosts'])->whereNumber('user')->name('owners.show');
 Route::get('/explore', [RecommendationController::class, 'explore'])->name('explore');
 Route::get('/for-you', [RecommendationController::class, 'explore'])->name('recommendations');
