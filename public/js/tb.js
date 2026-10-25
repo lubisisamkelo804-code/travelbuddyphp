@@ -75,6 +75,20 @@ document.addEventListener('click', e => {
     }
 });
 
+/* interest chips: toggle hidden checkbox + chip-on styling (delegated) */
+document.addEventListener('click', e => {
+    const inp = e.target.closest('label.chip input[type="checkbox"][name="interests[]"]');
+    if (!inp) return;                       // let the browser do the default toggle
+    const lab = inp.closest('label');
+    requestAnimationFrame(() => lab && lab.classList.toggle('chip-on', inp.checked));
+});
+document.addEventListener('change', e => {
+    const inp = e.target.closest('label.chip input[type="checkbox"][name="interests[]"]');
+    if (!inp) return;
+    const lab = inp.closest('label');
+    if (lab) lab.classList.toggle('chip-on', inp.checked);
+});
+
 /* star picker (reviews) */
 document.addEventListener('click', e => {
     const star = e.target.closest('[data-star]');

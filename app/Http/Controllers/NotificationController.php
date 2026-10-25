@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Conversation;
 use Illuminate\Support\Facades\Auth;
 
 class NotificationController extends Controller
@@ -15,7 +16,16 @@ class NotificationController extends Controller
 
     public function unread()
     {
-        return response()->json(['count' => Auth::user()->notifications()->where('is_read', false)->count()]);
+        $user = Auth::user();
+
+        return response()->json([
+            'count' => $user->notifications()->where('is_read', false)->count(),
+            'inbox' => $user->conversations()
+                ->with('lastMessage')
+                ->get()
+                ->filter(fn (Conversation $c) => $c->hasUnreadFor($user))
+                ->count(),
+        ]);
     }
 
     public function markAllRead()

@@ -5,11 +5,13 @@
     $destPoints = $destinations->values()->map(function ($d) {
         return ['kind' => 'destination', 'id' => $d->id, 'name' => $d->name, 'city' => $d->city,
                 'lat' => (float) $d->latitude, 'lng' => (float) $d->longitude,
+                'rating' => (float) $d->average_rating, 'reviews' => (int) $d->review_count,
                 'url' => route('owners.show', $d->owner_id)];
     });
     $eventPoints = $events->values()->map(function ($e) {
         return ['kind' => 'event', 'id' => $e->id, 'name' => $e->title, 'city' => $e->city,
                 'lat' => (float) $e->latitude, 'lng' => (float) $e->longitude,
+                'rating' => (float) $e->average_rating, 'reviews' => (int) $e->review_count,
                 'url' => route('events.show', $e->id) . '#book'];
     });
 @endphp

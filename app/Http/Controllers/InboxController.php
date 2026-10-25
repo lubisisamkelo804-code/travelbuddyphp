@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Conversation;
 use App\Models\Message;
 use App\Models\User;
+use App\Support\Notifier;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -18,6 +19,8 @@ class InboxController extends Controller
             ->get()
             ->sortByDesc(fn (Conversation $c) => $c->lastMessage?->created_at ?? $c->created_at)
             ->values();
+        // mark all conversations as read once the user opens their inbox
+        Auth::user()->conversationUsers()->update(['last_read_at' => now()]);
 
         $people = User::where('id', '!=', Auth::id())->orderBy('name')->limit(30)->get();
 
@@ -28,8 +31,20 @@ class InboxController extends Controller
     {
         $this->guard($conversation);
         $conversation->load(['messages.sender', 'users']);
+        // mark this conversation as read for the current user
+        Auth::user()->conversationUsers()
+            ->where('conversation_id', $conversation->id)
+            ->update(['last_read_at' => now()]);
 
         return view('inbox.show', compact('conversation'));
+    }
+
+    public function start(Request $r, User $user)
+    {
+        abort_if($user->id === Auth::id(), 403, 'You cannot message yourself.');
+        $conversation = $this->findOrCreate($user->id);
+
+        return redirect()->route('inbox.show', $conversation);
     }
 
     public function store(Request $r)
@@ -91,11 +106,28 @@ class InboxController extends Controller
 
     private function addMessage(Conversation $c, array $data): Message
     {
-        return $c->messages()->create([
+        $message = $c->messages()->create([
             'sender_id' => Auth::id(),
             'body' => $data['body'] ?? null,
             'share_type' => $data['share_type'] ?? null,
             'share_id' => $data['share_id'] ?? null,
         ]);
+
+        // reset sender's read marker so the thread stays coherent
+        $c->users()->updateExistingPivot(Auth::id(), ['last_read_at' => now()]);
+
+        // alert every other participant (toast + bell notification)
+        $preview = !empty($data['body'])
+            ? str($data['body'])->limit(50)->toString()
+            : 'Shared a ' . ($data['share_type'] ?? 'post');
+        foreach ($c->users()->where('user_id', '!=', Auth::id())->get() as $recipient) {
+            Notifier::send(
+                $recipient,
+                '💬 New message from ' . Auth::user()->name . ': ' . $preview,
+                route('inbox.show', $c)
+            );
+        }
+
+        return $message;
     }
 }
